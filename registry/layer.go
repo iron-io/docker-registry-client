@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/docker/distribution"
 	"github.com/opencontainers/go-digest"
 )
 
@@ -71,7 +70,33 @@ func (registry *Registry) HasLayer(repository string, digest digest.Digest) (boo
 	return false, err
 }
 
-func (registry *Registry) LayerMetadata(repository string, digest digest.Digest) (distribution.Descriptor, error) {
+// taken from https://github.com/docker/distribution/blob/06fa77aa11a3913096efcb9b5bd25db8ef55a939/blobs.go
+
+// Descriptor describes targeted content. Used in conjunction with a blob
+// store, a descriptor can be used to fetch, store and target any kind of
+// blob. The struct also describes the wire protocol format. Fields should
+// only be added but never changed.
+type Descriptor struct {
+	// MediaType describe the type of the content. All text based formats are
+	// encoded as utf-8.
+	MediaType string `json:"mediaType,omitempty"`
+
+	// Size in bytes of content.
+	Size int64 `json:"size,omitempty"`
+
+	// Digest uniquely identifies the content. A byte stream can be verified
+	// against against this digest.
+	Digest digest.Digest `json:"digest,omitempty"`
+
+	// URLs contains the source URLs of this content.
+	URLs []string `json:"urls,omitempty"`
+
+	// NOTE: Before adding a field here, please ensure that all
+	// other options have been exhausted. Much of the type relationships
+	// depend on the simplicity of this type.
+}
+
+func (registry *Registry) LayerMetadata(repository string, digest digest.Digest) (Descriptor, error) {
 	checkUrl := registry.url("/v2/%s/blobs/%s", repository, digest)
 	registry.Logf("registry.layer.check url=%s repository=%s digest=%s", checkUrl, repository, digest)
 
@@ -83,7 +108,7 @@ func (registry *Registry) LayerMetadata(repository string, digest digest.Digest)
 		return distribution.Descriptor{}, err
 	}
 
-	return distribution.Descriptor{
+	return Descriptor{
 		Digest: digest,
 		Size:   resp.ContentLength,
 	}, nil
